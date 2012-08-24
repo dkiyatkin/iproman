@@ -1,0 +1,30 @@
+{
+	"name": "iproman",
+	"description": "Itlife project management",
+	"version": "0.0.1",
+	"author": "Dmitriy Kiyatkin <d.kiyatkin@itlf.ru>",
+	"dependencies": {
+		"optimist": ">=0.3.4",
+		"glob": ">=3.1.10",
+		"mkdirp": ">=0.3.3",
+		"rimraf": ">=2.0.2",
+		"xml2js": ">=0.1.13"
+	},
+	"devDependencies": {
+		"nodeunit": ">=0.7.4"
+	},
+	"repository": "git://github.com/dkiyatkin/iproman.git",
+	"bugs": {
+		"url" : "http://github.com/dkiyatkin/iproman/issues"
+	},
+	"licenses" : [
+		{
+			"type": "MIT",
+			"url" : "http://github.com/dkiyatkin/iproman/raw/master/LICENSE"
+		}
+	],
+	"main": "bin/iproman",
+	"engines": {
+		"node": ">=0.6.0"
+	}
+}

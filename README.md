@@ -1,4 +1,6 @@
 iproman
 =======
 
-Itlife project management
+# Itlife project management.
+
+Коммандные утилиты и веб интерфейс для управления проектами.

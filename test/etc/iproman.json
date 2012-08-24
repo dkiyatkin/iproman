@@ -1,0 +1,12 @@
+{
+	"host": "localhost",
+	"backups": "test/backups/",
+	"svn": {
+		"templates": "templates/svn/",
+		"trunks": "test/trunks/",
+		"repos": "test/svn/",
+		"configs": "test/etc/projects/",
+		"auth": ""
+	},
+	"git": {}
+}
