@@ -1,7 +1,7 @@
 {
 	"name": "iproman",
 	"description": "Itlife project management",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"author": "Dmitriy Kiyatkin <d.kiyatkin@itlf.ru>",
 	"dependencies": {
 		"optimist": ">=0.3.4",
