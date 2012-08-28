@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+var util = require("util");
+var events = require('events');
+
 var argv = require('optimist').argv;
 
 this.projects = require(__dirname + '/../lib/projects.js');
@@ -8,6 +11,156 @@ this.svn = require(__dirname + '/../lib/svn.js');
 
 var self = this;
 
+/* Проверка всех аргументов и праметров */
+var check = function(name, exists, argv, cb) {
+	if (name) {
+		if (!argv && !cb) {
+			argv = name;
+			cb = exists;
+			name = false;
+			exists = false;
+		}
+		if (argv && argv.config) {
+			self.projects.info(argv.config, function(err, defconf) {
+				if (!err) {
+					if (defconf && defconf.svn && defconf.svn.trunks && defconf.host && defconf.svn.templates && defconf.svn.configs && defconf.svn.repos && defconf.backups && argv) {
+						if (!exists) {
+							if (name) {
+								if (!defconf.svn.projects[name]) {
+									cb(null, defconf);
+								} else { cb('Проект уже существует'); }
+							} else { cb(null, defconf); }
+						} else {
+							if (defconf.svn.projects[name]) {
+								cb(null, defconf);
+							} else { cb('Проект не существует'); }
+						}
+					} else { cb('Ошибка данных'); }
+				} else { cb('Ошибка defconf'); }
+			});
+		} else { cb('Не задан конфигурационный файл'); }
+	} else { cb('Не задано имя проекта'); }
+};
+this.check = check;
+
+this.create = function(name, argv, cb) {
+	check(name, false, argv, function(err, defconf) {
+		if (!err) {
+			self.svn.create(
+					name, defconf.svn.repos, defconf.svn.trunks,
+					defconf.host, defconf.svn.templates, 'trunk',
+						function(err, data) {
+				if (!err) {
+					self.projects.setDefault(name, defconf.svn.configs, argv, function(err) {
+						var data = '';
+						if (!err) { data = 'Проект ' + name + ' создан'; }
+						cb(err, data);
+					});
+				} else { cb(err); }
+			});
+		} else { cb(err); }
+	});
+};
+
+this.retarget = function(name, argv, cb) {
+	check(name, true, argv, function(err, defconf) {
+		if (!err) {
+			self.projects.updateProject(name, defconf.svn.projects[name], defconf.svn.configs, argv, function(err) {
+				var data = '';
+				if (!err) { data = 'Проект ' + name + ' перенастроен'; }
+				cb(err, data);
+			});
+		} else { cb(err); }
+	});
+};
+
+var Sync = function(name, argv, cb) {
+	events.EventEmitter.call(this);
+	var this2 = this;
+	this.run = function() {
+		check(name, true, argv, function(err, defconf) {
+			if (!err) {
+				self.ftp.sync(name, defconf.svn.projects[name], defconf, argv, function(err) {
+					var data = '';
+					if (!err) { data = 'Production ' + name + ' обновлен'; }
+					this2.emit('end', err, data);
+					if (cb) { cb(err, data); }
+				}).on('output', function(output) {
+					this2.emit('output', output);
+				}).on('logfile', function(logfile) {
+					this2.emit('logfile', logfile);
+					console.log('Запись в ' + logfile);
+				});
+			} else {
+				this2.emit('end', err); // logfile не появиться
+				if (cb) { cb(err); }
+			}
+		});
+	}
+};
+util.inherits(Sync, events.EventEmitter);
+this.sync = function(name, argv, cb) {
+	var sync = new Sync(name, argv, cb);
+	sync.run();
+	return sync;
+};
+
+var Backup = function(name, argv, cb) {
+	events.EventEmitter.call(this);
+	var this2 = this;
+	this.run = function() {
+		check(name, true, argv, function(err, defconf) {
+			if (!err) {
+				self.ftp.backup(name, defconf.svn.projects[name], defconf, argv, function(err) {
+					var data = '';
+					if (!err) { data = 'Backup ' + name + ' сделан'; }
+					this2.emit('end', err, data);
+					if (cb) { cb(err, data); }
+				}).on('output', function(output) {
+					this2.emit('output', output);
+				}).on('logfile', function(logfile) {
+					this2.emit('logfile', logfile);
+					console.log('Запись в ' + logfile);
+				});
+			} else {
+				this2.emit('end', err); // logfile не появиться
+				if (cb) { cb(err); }
+			}
+		});
+	};
+};
+util.inherits(Backup, events.EventEmitter);
+this.backup = function(name, argv, cb) {
+	var backup = new Backup(name, argv, cb);
+	backup.run();
+	return backup;
+};
+
+this.freeze = function(name, argv, cb) {
+	check(name, true, argv, function(err, defconf) {
+		if (!err) {
+			self.svn.freeze(name, defconf.svn.configs, defconf.svn.trunks, defconf.svn.auth, argv, function(err) {
+				var data = '';
+				if (!err) { data = 'Проект ' + name + ' заморожен:\n' + data.split('\n'); }
+				cb(err, data);
+			});
+		} else { cb(err); }
+	});
+};
+
+this.remove = function(name, argv, cb) {
+	check(name, true, argv, function(err, defconf) {
+		if (!err) {
+			self.projects.remove(
+					name, defconf.svn.configs, defconf.svn.trunks, defconf.svn.repos, defconf.backups, argv, function(err) {
+				var data = '';
+				if (!err) { data = 'Проект ' + name + ' удален'; }
+				cb(err, data);
+			});
+		} else { cb(err); }
+	});
+};
+
 if (require.main === module) { // если приложение запускается как отдельная программа
 	var end = function(err, data) {
 		if (!err) {
@@ -15,80 +168,29 @@ if (require.main === module) { // если приложение запускае
 				console.log(JSON.stringify(data, null, '  '));
 			}
 		} else {
-			if (err == 1) { err = 'Ошибка'; }
+			if (err == 1) { err = 'Ошибка выполнения'; }
 			console.error(err);
 			process.exit(1);
 		}
 	};
-
-	if (argv.config) {
-		var project = argv._[0];
-		self.projects.info(argv.config, function(err, defconf) {
-			project = (typeof(argv.info)=='string')?argv.info:argv._[0];
-			if (argv.create) { // создание
-				project = (typeof(argv.create)=='string')?argv.create:argv._[0];
-				if (project && defconf.svn.repos && defconf.svn.trunks && defconf.host && defconf.svn.templates && project && defconf.svn.configs && argv) {
-					if (!defconf.svn.projects[project]) {
-						self.svn.create(
-								project, defconf.svn.repos, defconf.svn.trunks,
-								defconf.host, defconf.svn.templates, 'trunk',
-									function(err, data) {
-							self.projects.setDefault(project, defconf.svn.configs, argv, function(err, data) {
-								end(err, data);
-							});
-						});
-					} else { end('Проект уже существует'); }
-				} else { end('Ошибка данных'); }
-			} else if (argv.set) { // настройка
-				project = (typeof(argv.set)=='string')?argv.set:argv._[0];
-				if (project && defconf.svn.configs && argv) {
-					if (defconf.svn.projects[project]) {
-						self.projects.updateProject(
-								project, defconf.svn.projects[project], defconf.svn.configs, argv,
-								function(err, data) {
-							end(err, data);
-						});
-					} else { end('Проект не существует'); }
-				} else { end('Ошибка данных'); }
-			} else if (argv.sync) { // синхронизация
-				project = (typeof(argv.sync)=='string')?argv.sync:argv._[0];
-				if (project && defconf && argv) {
-					if (defconf.svn.projects[project]) {
-						self.ftp.sync(project, defconf.svn.projects[project], defconf, argv, function(err, data) {
-							end(err, data);
-						});
-					} else { end('Проект не существует'); }
-				} else { end('Ошибка данных'); }
-			} else if (argv.freeze) { // заморозка
-				project = (typeof(argv.freeze)=='string')?argv.freeze:argv._[0];
-				if (defconf.svn.projects[project]) {
-					self.svn.freeze(project, defconf.svn.configs, defconf.svn.trunks, defconf.svn.auth, argv, function(err, data) {
-						if (!err) {
-							end(err, data.split('\n'));
-						} else { end(err); }
-					});
-				} else { end('Проект не существует'); }
-			} else if (argv.backup) { // резервная копия
-				project = (typeof(argv.backup)=='string')?argv.backup:argv._[0];
-				if (project && defconf && argv) {
-					if (defconf.svn.projects[project]) {
-						self.ftp.backup(project, defconf.svn.projects[project], defconf, argv, function(err, data) {
-							end(err, data);
-						});
-					} else { end('Проект не существует'); }
-				} else { end('Ошибка данных'); }
-			} else if (argv.remove) { // удаление
-				project = (typeof(argv.remove)=='string')?argv.remove:argv._[0];
-				if (project && defconf.svn.configs && defconf.svn.trunks && defconf.svn.repos && defconf.backups && argv) {
-					if (defconf.svn.projects[project]) {
-						self.projects.remove(
-								project, defconf.svn.configs, defconf.svn.trunks, defconf.svn.repos, defconf.backups, argv,
-								function(err, data) {
-							end(err, data);
-						});
-					} else { end('Проект не существует'); }
-				} else { end('Ошибка данных'); }
-			} else { end(err, defconf); } // общая информация
-		});
-	}
+	var project = argv._[0];
+	if (argv.create) { // создание
+		project = (typeof(argv.create)=='string')?argv.create:argv._[0];
+		self.create(project, argv, end);
+	} else if (argv.set) { // настройка
+		project = (typeof(argv.set)=='string')?argv.set:argv._[0];
+		self.retarget(project, argv, end);
+	} else if (argv.sync) { // синхронизация
+		project = (typeof(argv.sync)=='string')?argv.sync:argv._[0];
+		self.sync(project, argv, end);
+	} else if (argv.freeze) { // заморозка
+		project = (typeof(argv.freeze)=='string')?argv.freeze:argv._[0];
+		self.freeze(project, argv, end);
+	} else if (argv.backup) { // резервная копия
+		project = (typeof(argv.backup)=='string')?argv.backup:argv._[0];
+		self.backup(project, argv, end);
+	} else if (argv.remove) { // удаление
+		project = (typeof(argv.remove)=='string')?argv.remove:argv._[0];
+		self.remove(project, argv, end);
+	} else { check(argv, end); } // общая информация
 }
