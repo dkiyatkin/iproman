@@ -140,7 +140,7 @@ this.freeze = function(name, argv, cb) {
 	check(name, true, argv, function(err, defconf) {
 		if (!err) {
 			self.svn.freeze(name, defconf.svn.configs, defconf.svn.trunks, defconf.svn.auth, argv, function(err, data) {
-				if (!err) { data = 'Проект ' + name + ' заморожен:\n' + data.split('\n'); }
+				if (!err) { data = 'Проект ' + name + ' заморожен:\n' + data; }
 				cb(err, data);
 			});
 		} else { cb(err); }
