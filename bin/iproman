@@ -77,6 +77,15 @@ this.retarget = function(name, argv, cb) {
 var Sync = function(name, argv, cb) {
 	events.EventEmitter.call(this);
 	var this2 = this;
+	this.cmd = false;
+	var kill;
+	this.kill = function() {
+		if (this2.cmd && this2.cmd.kill) {
+			this2.cmd.kill();
+		} else {
+			kill = true;
+		}
+	};
 	this.run = function() {
 		check(name, true, argv, function(err, defconf) {
 			if (!err) {
@@ -90,13 +99,16 @@ var Sync = function(name, argv, cb) {
 				}).on('logfile', function(logfile) {
 					this2.emit('logfile', logfile);
 					console.log('Запись в ' + logfile);
+				}).on('cmd', function(cmd) {
+					this2.cmd = cmd;
+					if (cmd.kill && kill) { cmd.kill(); }
 				});
 			} else {
 				this2.emit('end', err); // logfile не появиться
 				if (cb) { cb(err); }
 			}
 		});
-	}
+	};
 };
 util.inherits(Sync, events.EventEmitter);
 this.sync = function(name, argv, cb) {
@@ -108,6 +120,15 @@ this.sync = function(name, argv, cb) {
 var Backup = function(name, argv, cb) {
 	events.EventEmitter.call(this);
 	var this2 = this;
+	this.cmd = false;
+	var kill;
+	this.kill = function() {
+		if (this2.cmd && this2.cmd.kill) {
+			this2.cmd.kill();
+		} else {
+			kill = true;
+		}
+	};
 	this.run = function() {
 		check(name, true, argv, function(err, defconf) {
 			if (!err) {
@@ -121,6 +142,9 @@ var Backup = function(name, argv, cb) {
 				}).on('logfile', function(logfile) {
 					this2.emit('logfile', logfile);
 					console.log('Запись в ' + logfile);
+				}).on('cmd', function(cmd) {
+					this2.cmd = cmd;
+					if (cmd.kill && kill) { cmd.kill(); }
 				});
 			} else {
 				this2.emit('end', err); // logfile не появиться
